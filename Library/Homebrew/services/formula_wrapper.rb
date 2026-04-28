@@ -92,6 +92,12 @@ module Homebrew
         )
       end
 
+      # timer_file should only be used on linux.
+      sig { returns(Pathname) }
+      def timer_file
+        @timer_file ||= formula.systemd_timer_path
+      end
+
       # Whether the service should be launched at startup
       sig { returns(T::Boolean) }
       def service_startup?
@@ -114,6 +120,13 @@ module Homebrew
       sig { returns(Pathname) }
       def dest
         dest_dir + service_file.basename
+      end
+
+      # Path to destination timer. If run as root, it's in `boot_path`, else `user_path`.
+      # Should only be used on linux.
+      sig { returns(Pathname) }
+      def timer_dest
+        dest_dir + timer_file.basename
       end
 
       # Returns `true` if any version of the formula is installed.
@@ -147,7 +160,8 @@ module Homebrew
           reset_cache! unless cached
           status_success
         else # System.systemctl?
-          System::Systemctl.quiet_run("status", service_file.basename)
+          System::Systemctl.quiet_run("status", service_file.basename) unless timed?
+          System::Systemctl.quiet_run("status", timer_file.basename)
         end
       end
 
@@ -162,6 +176,21 @@ module Homebrew
           user_path_service_file_present?
         else
           boot_path_service_file_present? || user_path_service_file_present?
+        end
+      end
+
+      # Returns `true` if timer is present, else `false`
+      # Accepts `type` with values `:root` for boot path or `:user` for user path.
+      # should only be used on linux.
+      sig { params(type: T.nilable(Symbol)).returns(T::Boolean) }
+      def timer_file_present?(type: nil)
+        case type
+        when :root
+          boot_path_timer_file_present?
+        when :user
+          user_path_timer_file_present?
+        else
+          boot_path_timer_file_present? || user_path_timer_file_present?
         end
       end
 
@@ -369,6 +398,22 @@ module Homebrew
         return false if user_path.blank?
 
         (user_path + service_file.basename).exist?
+      end
+
+      sig { returns(T::Boolean) }
+      def boot_path_timer_file_present?
+        boot_path = System.boot_path
+        return false if boot_path.blank?
+
+        (boot_path + timer_file.basename).exist?
+      end
+
+      sig { returns(T::Boolean) }
+      def user_path_timer_file_present?
+        user_path = System.user_path
+        return false if user_path.blank?
+
+        (user_path + timer_file.basename).exist?
       end
 
       sig { returns(Regexp) }

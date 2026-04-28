@@ -522,7 +522,7 @@ module Homebrew
       if @run_type == RUN_TYPE_CRON
         minutes = (@cron[:Minute] == "*") ? "*" : format("%02d", @cron[:Minute])
         hours   = (@cron[:Hour] == "*") ? "*" : format("%02d", @cron[:Hour])
-        options << "OnCalendar=#{@cron[:Weekday]}-*-#{@cron[:Month]}-#{@cron[:Day]} #{hours}:#{minutes}:00"
+        options << "OnCalendar=#{@cron[:Weekday] == "*" ? "" : @cron[:Weekday]} *-#{@cron[:Month]}-#{@cron[:Day]} #{hours}:#{minutes}:00"
       end
 
       <<~SYSTEMD
@@ -533,7 +533,7 @@ module Homebrew
         WantedBy=timers.target
 
         [Timer]
-        Unit=#{service_name}
+        Unit=#{service_name}.service
         #{options.join("\n")}
       SYSTEMD
     end
